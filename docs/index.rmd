@@ -1,0 +1,127 @@
+---
+title: "Adelie Penguins and Mediation Effect"
+Author: M. Hyde
+date: "2024-02-01"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+**This code uses the penguins dataset and regresses `bill_length_mm` on `flipper_length_mm` and `body_mass_g` to perform the Sobel test for mediation effect.**
+
+# Importing data
+
+```{r}
+# Install and load necessary packages
+if (!require("palmerpenguins")) install.packages("palmerpenguins")
+library(palmerpenguins)
+
+# Load the penguins dataset
+data("penguins")
+str(penguins)
+
+# Check for missing values
+sum(is.na(penguins))
+```
+
+# Remove rows with missing values
+```{r}
+# Remove rows with missing values
+penguins <- na.omit(penguins)
+
+head(penguins)
+```
+# Select only the species "Adelie"
+```{r}
+penguins <- subset(penguins, species == "Adelie")
+
+```
+
+# Problem 1
+
+Given the provided dataset "penguins", consider the model regressing `bill_length_mm` on `flipper_length_mm`, and `body_mass_g`. Conduct a Sobel test to see whether there is a mediation effect. You need to consider the three relevant models:
+
+1. Model 1: \(bill\_length_i = \beta_{11} + \beta_{12}flipper\_length_i + \epsilon_i\)
+2. Model 2: \(body\_mass_i = \beta_{21} + \beta_{22}flipper\_length_i + \epsilon_i\)
+3. Model 3: \(bill\_length_i = \beta_{31} + \beta_{32}body\_mass_i + \beta_{33}flipper\_length_i + \epsilon_i\)
+
+Suppose the variance of \(\epsilon_i\) is known with \(\sigma^2 = 1\), for all three models. Use the level of significance \(\alpha\)=0.05.
+
+**(1) What is the null hypothesis of the Sobel test?**
+
+The null hypothesis of the Sobel test is that there is no significant indirect effect or mediation effect.
+
+\(H_0\): \(\beta_{12}=\beta_{33} = 0\)
+
+This hypothesis implies that the mediator variable `body_mass_g` does not significantly mediate the relationship between the independent variable `flipper_length_mm` and the dependent variable `bill_length_mm`.
+
+**(2) Regress the three models and find the estimators for (β11, β12), (β21, β22), and (β31, β32, β33).**
+
+```{r}
+# Model 1: bill_length_i = β11 + β12 * flipper_length_i + εi
+model1 <- lm(bill_length_mm ~ flipper_length_mm, data = penguins)
+beta_11_12 <- coef(model1)
+print(beta_11_12)
+
+# Model 2: body_mass_i = β21 + β22 * flipper_length_i + εi
+model2 <- lm(body_mass_g ~ flipper_length_mm, data = penguins)
+beta_21_22 <- coef(model2)
+print(beta_21_22)
+
+# Model 3: bill_length_i = β31 + β32 * body_mass_i + β33 * flipper_length_i + εi
+model3 <- lm(bill_length_mm ~ body_mass_g + flipper_length_mm, data = penguins)
+beta_31_32_33 <- coef(model3)
+print(beta_31_32_33)
+```
+
+**(3) Find the variance of \(\hat{\beta}_{22}\) and \(\hat{\beta}_{32}\).**
+
+```{r}
+# Extract covariance matrix
+cov_matrix_model2 <- vcov(model2)
+cov_matrix_model3 <- vcov(model3)
+
+# Variance of beta22 in Model 2
+var_beta22_model2 <- cov_matrix_model2["flipper_length_mm", "flipper_length_mm"]
+cat("Variance of beta22 in Model 2:", var_beta22_model2, "\n")
+
+# Variance of beta32 in Model 3
+var_beta32_model3 <- cov_matrix_model3["body_mass_g", "body_mass_g"]
+cat("Variance of beta32 in Model 3:", var_beta32_model3, "\n")
+```
+
+**(4) Find the `z` test statistic.**
+
+The z test formula
+
+\[ Z = \frac{\hat{B}_{12} - \hat{B}_{33}}{\sqrt{\hat{B}_{22}^2 \cdot \text{Var}(\hat{B}_{32}) + \hat{B}_{32}^2 \cdot \text{Var}(\hat{B}_{22})}} \]
+
+```{r}
+# Coefficient estimates
+beta12 <- coef(model1)["flipper_length_mm"]
+beta22 <- coef(model2)["flipper_length_mm"]
+beta33 <- coef(model3)["flipper_length_mm"]
+beta32 <- coef(model3)["body_mass_g"]
+var_beta32 <- cov_matrix_model3["body_mass_g", "body_mass_g"]
+var_beta22 <- cov_matrix_model2["flipper_length_mm", "flipper_length_mm"]
+
+# Calculate the Sobel test statistic
+z_test_statistic <- (beta12 - beta33) / sqrt(beta22^2 * var_beta32 + beta32^2 * var_beta22)
+print(z_test_statistic)
+```
+
+**(5) Find the `p − value` and the conclusion of the test**
+
+Using the formula \( p = 2(1 - \Phi(|z|)) \):
+
+```{r}
+# Using results from z_test_statistic calculated
+p_value_sobel_formula <- 2 * (1 - pnorm(abs(z_test_statistic)))
+print(p_value_sobel_formula)
+```
+
+The p-value is less than 0.05. Hence, we reject the Null Hypothesis. There is a significant mediation effect.
+
+
